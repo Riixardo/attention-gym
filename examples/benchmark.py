@@ -32,6 +32,7 @@ from attn_gym.masks import (
 from attn_gym.mods import generate_alibi_bias, generate_tanh_softcap
 
 torch.set_default_device("cuda")
+block_size = 128
 
 def generate_pattern_sparse_block_causal_mask(sparsity_ratio: float):
     """
@@ -53,8 +54,8 @@ def generate_pattern_sparse_block_causal_mask(sparsity_ratio: float):
 
     def pattern_sparse_block_causal_mask_mod(b, h, q_idx, kv_idx):
 
-        q_block_idx = q_idx // _DEFAULT_SPARSE_BLOCK_SIZE
-        kv_block_idx = kv_idx // _DEFAULT_SPARSE_BLOCK_SIZE
+        q_block_idx = q_idx // block_size
+        kv_block_idx = kv_idx // block_size
         is_block_causal = q_block_idx >= kv_block_idx
 
         block_index_sum = q_block_idx + kv_block_idx
@@ -105,12 +106,12 @@ flex_attention = torch.compile(flex_attention, dynamic=False)
 data_type = torch.float16
 
 # The kernels will utilize block sparsity to increase performance
-print(f"Using the default sparsity block size: {_DEFAULT_SPARSE_BLOCK_SIZE}")
+print(f"Using the sparsity block size: {block_size}")
 
 
 @lru_cache
 def create_block_mask_cached(score_mod, B, H, M, N, device="cuda"):
-    block_mask = create_block_mask(score_mod, B, H, M, N, device=device)
+    block_mask = create_block_mask(score_mod, B, H, M, N, device=device, BLOCK_SIZE=block_size)
     return block_mask
 
 
@@ -252,7 +253,7 @@ def test_mask(
         if print_mask:
             print(f"\nBlock Mask:\n{block_mask}")
         if print_mask:
-            size = S // _DEFAULT_SPARSE_BLOCK_SIZE
+            size = S // block_size
             upper_half = (size // 2) * size - (size // 2)
             upper_half_sparsity_contribition = 100 * upper_half / (size ** 2)
             lower_triangle_sparsity = (block_mask.sparsity() - upper_half_sparsity_contribition) * 2
@@ -315,9 +316,9 @@ def main(examples: List[str] = ["all"]):
 
     plt.xlabel("Sparsity Ratio of Lower Triangle")
     plt.ylabel("Relative Runtime Compared to FlashAttentionV2")
-    plt.title("flexattention block sparse hdim64_nheads_32_bts1_fwd_causal")
+    plt.title(f"flexattention blocksize{block_size} sparse hdim64_nheads_32_bts1_fwd_causal")
     plt.legend()
-    plt.savefig("runtimes_vs_sparsity.png", dpi=300, bbox_inches="tight")
+    plt.savefig(f"runtimes_vs_sparsity_{block_size}.png", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":
