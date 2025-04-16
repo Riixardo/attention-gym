@@ -38,7 +38,7 @@ def main(device: str = "cpu"):
 
     query, key = make_tensor(), make_tensor()
 
-    sliding_window_mask = generate_sliding_window(3)
+    sliding_window_mask = generate_sliding_window(5)
     visualize_attention_scores(
         query, key, mask_mod=sliding_window_mask, device=device, name="sliding_window_mask"
     )
